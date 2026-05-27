@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RetireSim — Monte Carlo Retirement Planner</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg:        #060c18;
+  --surface:   #0c1829;
+  --surface2:  #122038;
+  --border:    #1c3254;
+  --text:      #dce8f4;
+  --muted:     #6a8aa4;
+  --accent:    #29b5d8;
+  --accent-lo: rgba(41,181,216,.12);
+  --green:     #22d374;
+  --green-lo:  rgba(34,211,116,.15);
+  --orange:    #ff9e3d;
+  --red:       #ff5f5f;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ── SIDEBAR ───────────────────────────────────────────── */
+.sidebar {
+  width: 320px;
+  min-width: 320px;
+  background: #040a14;
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.brand {
+  padding: 24px 22px 18px;
+  border-bottom: 1px solid var(--border);
+}
+.brand-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+.brand-icon {
+  width: 32px;
+  height: 32px;
+  background: linear-gradient(135deg, var(--accent), #1a7fa8);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+}
+.brand h1 { font-size: 1.25rem; font-weight: 700; letter-spacing: -.02em; }
+.brand p  { font-size: .78rem; color: var(--muted); }
+
+.form-body { padding: 20px 18px; flex: 1; }
+
+.form-group { margin-bottom: 16px; }
+.form-group label {
+  display: block;
+  font-size: .72rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  margin-bottom: 6px;
+}
+
+.input-wrap { position: relative; }
+.prefix {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  font-size: .9rem;
+  pointer-events: none;
+}
+.input-wrap input[type=number] {
+  width: 100%;
+  padding: 9px 10px 9px 26px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: .93rem;
+  font-family: inherit;
+  transition: border-color .18s;
+  appearance: textfield;
+}
+.input-wrap input:focus { outline: none; border-color: var(--accent); }
+
+.slider-wrap { display: flex; align-items: center; gap: 10px; }
+.slider-wrap input[type=range] {
+  flex: 1;
+  -webkit-appearance: none;
+  height: 4px;
+  border-radius: 4px;
+  background: var(--border);
+  accent-color: var(--accent);
+}
+.slider-val {
+  font-size: .85rem;
+  font-weight: 600;
+  color: var(--accent);
+  min-width: 36px;
+  text-align: right;
+}
+
+.assumptions {
+  margin: 18px 0;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.assumptions h4 {
+  font-size: .72rem;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.assumption-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: .82rem;
+  margin-bottom: 4px;
+}
+.assumption-row span:last-child { color: var(--accent); font-weight: 600; }
+
+.run-btn {
+  width: 100%;
+  padding: 12px;
+  background: linear-gradient(135deg, #1a8aab, var(--accent));
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  font-family: inherit;
+  font-size: .95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity .18s, transform .1s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+.run-btn:hover:not(:disabled) { opacity: .9; transform: translateY(-1px); }
+.run-btn:disabled { opacity: .55; cursor: default; }
+
+/* ── MAIN ──────────────────────────────────────────────── */
+.main {
+  flex: 1;
+  overflow-y: auto;
+  padding: 28px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+/* Welcome */
+.welcome {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  color: var(--muted);
+  text-align: center;
+  padding: 60px 0;
+}
+.welcome-icon { font-size: 56px; opacity: .4; }
+.welcome h2 { font-size: 1.15rem; color: var(--text); font-weight: 600; }
+.welcome p  { font-size: .88rem; max-width: 340px; line-height: 1.6; }
+
+/* Results header */
+.results-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.results-header h2 { font-size: 1.1rem; font-weight: 700; }
+.results-meta { font-size: .78rem; color: var(--muted); }
+
+/* Stat cards */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+.stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px 16px;
+  position: relative;
+  overflow: hidden;
+}
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--accent);
+  border-radius: 12px 12px 0 0;
+}
+.stat-card.green::before { background: var(--green); }
+.stat-card.orange::before { background: var(--orange); }
+.stat-card.red::before { background: var(--red); }
+
+.stat-label { font-size: .7rem; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 8px; }
+.stat-value { font-size: 1.6rem; font-weight: 700; line-height: 1; margin-bottom: 4px; }
+.stat-sub   { font-size: .73rem; color: var(--muted); }
+
+/* Charts */
+.chart-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px 22px;
+}
+.chart-card h2 {
+  font-size: .9rem;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.chart-subtitle { font-size: .75rem; color: var(--muted); margin-bottom: 16px; }
+.chart-legend {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: .75rem;
+  color: var(--muted);
+}
+.legend-swatch {
+  width: 24px;
+  height: 10px;
+  border-radius: 3px;
+}
+.chart-box { position: relative; height: 300px; }
+
+/* no-success warning */
+.warn-box {
+  background: rgba(255,95,95,.08);
+  border: 1px solid rgba(255,95,95,.3);
+  border-radius: 10px;
+  padding: 14px 16px;
+  font-size: .85rem;
+  color: #ffaaaa;
+}
+.warn-box strong { display: block; margin-bottom: 4px; }
+
+/* Methodology footer */
+.method-note {
+  font-size: .73rem;
+  color: var(--muted);
+  line-height: 1.6;
+  padding-top: 4px;
+}
+
+/* Spinner */
+.spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255,255,255,.25);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Mobile fallback */
+@media (max-width: 900px) {
+  body { flex-direction: column; overflow: auto; height: auto; }
+  .sidebar { width: 100%; min-width: 0; }
+  .main { padding: 20px 16px; }
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 480px) {
+  .stats-grid { grid-template-columns: 1fr 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- ── SIDEBAR ── -->
+<aside class="sidebar">
+  <div class="brand">
+    <div class="brand-row">
+      <div class="brand-icon">📈</div>
+      <h1>RetireSim</h1>
+    </div>
+    <p>Monte Carlo Retirement Planner</p>
+  </div>
+
+  <div class="form-body">
+
+    <div class="form-group">
+      <label>Starting Portfolio</label>
+      <div class="input-wrap">
+        <span class="prefix">$</span>
+        <input type="number" id="startingAmount" value="10000" min="0" step="1000">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Monthly Contribution</label>
+      <div class="input-wrap">
+        <span class="prefix">$</span>
+        <input type="number" id="monthlyContrib" value="1500" min="0" step="100">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Retirement Target</label>
+      <div class="input-wrap">
+        <span class="prefix">$</span>
+        <input type="number" id="retirementTarget" value="1500000" min="1" step="50000">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Simulations — <span id="nSimLabel">1 000</span></label>
+      <div class="slider-wrap">
+        <input type="range" id="nSim" min="100" max="5000" step="100" value="1000"
+               oninput="document.getElementById('nSimLabel').textContent = Number(this.value).toLocaleString()">
+        <span class="slider-val" id="nSimSpeed">Balanced</span>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Projection Horizon — <span id="maxYrLabel">40</span> yr</label>
+      <div class="slider-wrap">
+        <input type="range" id="maxYears" min="5" max="60" step="5" value="40"
+               oninput="document.getElementById('maxYrLabel').textContent = this.value">
+        <span class="slider-val" id="maxYrVal">40</span>
+      </div>
+    </div>
+
+    <div class="assumptions">
+      <h4>S&amp;P 500 Assumptions (fixed)</h4>
+      <div class="assumption-row"><span>Avg. Annual Return</span><span>10.5%</span></div>
+      <div class="assumption-row"><span>Annual Volatility (σ)</span><span>17.5%</span></div>
+      <div class="assumption-row"><span>Model</span><span>GBM (log-normal)</span></div>
+    </div>
+
+    <button class="run-btn" id="runBtn" onclick="runSim()">Run Simulation</button>
+  </div>
+</aside>
+
+<!-- ── MAIN ── -->
+<main class="main" id="main">
+
+  <!-- Welcome state -->
+  <div id="welcomeState" class="welcome">
+    <div class="welcome-icon">🎯</div>
+    <h2>How long until you can retire?</h2>
+    <p>Enter your starting balance, monthly contributions, and target nest egg, then run the simulation to see thousands of possible futures.</p>
+  </div>
+
+  <!-- Results (hidden until first run) -->
+  <div id="resultsState" style="display:none; display:flex; flex-direction:column; gap:22px;">
+
+    <div class="results-header">
+      <h2>Simulation Results</h2>
+      <span class="results-meta" id="resultsMeta"></span>
+    </div>
+
+    <div id="warnBox" class="warn-box" style="display:none">
+      <strong>Target may be unreachable within your horizon.</strong>
+      Fewer than 5% of simulations reached the retirement goal. Consider increasing your monthly contribution or extending the projection horizon.
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card" id="cardSuccess">
+        <div class="stat-label">Success Rate</div>
+        <div class="stat-value" id="statSuccess">--</div>
+        <div class="stat-sub">reached retirement goal</div>
+      </div>
+      <div class="stat-card" id="cardMedian">
+        <div class="stat-label">Median Retirement</div>
+        <div class="stat-value" id="statMedian">--</div>
+        <div class="stat-sub">50% of paths retire by then</div>
+      </div>
+      <div class="stat-card" id="cardOptimistic">
+        <div class="stat-label">Optimistic (P10)</div>
+        <div class="stat-value" id="statOptimistic">--</div>
+        <div class="stat-sub">best 10% retire this fast</div>
+      </div>
+      <div class="stat-card" id="cardConservative">
+        <div class="stat-label">Conservative (P90)</div>
+        <div class="stat-value" id="statConservative">--</div>
+        <div class="stat-sub">90% retire within this</div>
+      </div>
+    </div>
+
+    <!-- Growth fan chart -->
+    <div class="chart-card">
+      <h2>Portfolio Growth Projection</h2>
+      <p class="chart-subtitle">Shaded bands show the range of simulated outcomes over time.</p>
+      <div class="chart-legend">
+        <div class="legend-item">
+          <div class="legend-swatch" style="background:rgba(41,181,216,.18)"></div>
+          P10 – P90 range
+        </div>
+        <div class="legend-item">
+          <div class="legend-swatch" style="background:rgba(41,181,216,.35)"></div>
+          P25 – P75 range
+        </div>
+        <div class="legend-item">
+          <div class="legend-swatch" style="background:var(--accent); height:3px; border-radius:2px"></div>
+          Median
+        </div>
+        <div class="legend-item">
+          <div class="legend-swatch" style="background:var(--green); height:2px; border-style:dashed; border-width:2px; border-color:var(--green); background:none; border-radius:0"></div>
+          Target
+        </div>
+      </div>
+      <div class="chart-box"><canvas id="growthChart"></canvas></div>
+    </div>
+
+    <!-- Distribution bar chart -->
+    <div class="chart-card">
+      <h2>Retirement Year Distribution</h2>
+      <p class="chart-subtitle" id="distSubtitle"></p>
+      <div class="chart-box"><canvas id="distChart"></canvas></div>
+    </div>
+
+    <p class="method-note">
+      Each path simulates monthly portfolio growth using geometric Brownian motion (GBM) with the
+      historical S&amp;P 500 mean return (10.5%/yr) and volatility (17.5%/yr). Monthly contributions
+      are added after each market step. Past performance does not guarantee future results.
+      This tool is for educational purposes only and does not constitute financial advice.
+    </p>
+
+  </div><!-- /resultsState -->
+</main>
+
+<script>
+// ── helpers ──────────────────────────────────────────────
+function fmtCurrency(v) {
+  if (v == null || isNaN(v)) return '--';
+  if (v >= 1e9) return '$' + (v / 1e9).toFixed(2) + 'B';
+  if (v >= 1e6) return '$' + (v / 1e6).toFixed(2) + 'M';
+  if (v >= 1e3) return '$' + (v / 1e3).toFixed(1) + 'K';
+  return '$' + v.toFixed(0);
+}
+function fmtYears(y) {
+  if (y == null || isNaN(y)) return '--';
+  const yr = Math.floor(y);
+  const mo = Math.round((y - yr) * 12);
+  if (mo === 0) return yr + ' yr';
+  return yr + ' yr ' + mo + ' mo';
+}
+
+// keep slider label in sync
+document.getElementById('nSim').addEventListener('input', function() {
+  const v = +this.value;
+  const el = document.getElementById('nSimSpeed');
+  el.textContent = v < 500 ? 'Fast' : v <= 2000 ? 'Balanced' : 'Precise';
+});
+document.getElementById('maxYears').addEventListener('input', function() {
+  document.getElementById('maxYrVal').textContent = this.value;
+});
+
+// ── chart instances ───────────────────────────────────────
+let growthChart = null;
+let distChart   = null;
+
+// ── main simulation call ──────────────────────────────────
+async function runSim() {
+  const btn = document.getElementById('runBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Simulating…';
+
+  const payload = {
+    starting_amount:      +document.getElementById('startingAmount').value,
+    monthly_contribution: +document.getElementById('monthlyContrib').value,
+    retirement_target:    +document.getElementById('retirementTarget').value,
+    n_simulations:        +document.getElementById('nSim').value,
+    max_years:            +document.getElementById('maxYears').value,
+  };
+
+  try {
+    const res  = await fetch('/simulate', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error('Simulation failed');
+    const data = await res.json();
+
+    updateResults(data, payload.retirement_target);
+
+    document.getElementById('welcomeState').style.display  = 'none';
+    document.getElementById('resultsState').style.display  = 'flex';
+  } catch (e) {
+    alert('Error running simulation: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = 'Run Simulation';
+  }
+}
+
+// ── update UI ─────────────────────────────────────────────
+function updateResults(data, target) {
+  const s = data.stats;
+  const sr = data.success_rate;
+
+  // Meta line
+  document.getElementById('resultsMeta').textContent =
+    data.n_simulations.toLocaleString() + ' paths · ' +
+    data.parameters.annual_return_pct + '% return · ' +
+    data.parameters.annual_volatility_pct + '% σ';
+
+  // Warn box
+  document.getElementById('warnBox').style.display = sr < 5 ? 'block' : 'none';
+
+  // Success rate card
+  const successEl  = document.getElementById('statSuccess');
+  const successCard = document.getElementById('cardSuccess');
+  successEl.textContent = sr.toFixed(1) + '%';
+  successCard.className = 'stat-card ' + (sr >= 80 ? 'green' : sr >= 50 ? 'orange' : 'red');
+
+  // Median card
+  document.getElementById('statMedian').textContent = s.median_years != null ? fmtYears(s.median_years) : '--';
+
+  // Optimistic P10 card
+  document.getElementById('statOptimistic').textContent = s.p10_years != null ? fmtYears(s.p10_years) : '--';
+  document.getElementById('cardOptimistic').className = 'stat-card green';
+
+  // Conservative P90 card
+  document.getElementById('statConservative').textContent = s.p90_years != null ? fmtYears(s.p90_years) : '--';
+  document.getElementById('cardConservative').className = 'stat-card orange';
+
+  // Charts
+  buildGrowthChart(data, target);
+  buildDistChart(data);
+}
+
+// ── fan chart ─────────────────────────────────────────────
+function buildGrowthChart(data, target) {
+  const months = data.months_axis;
+  const toYr   = m => +(m / 12).toFixed(3);
+  const bands  = data.bands;
+  const yMax   = data.y_max;
+
+  // Convert bands to {x, y} point objects
+  function pts(arr) { return months.map((m, i) => ({ x: toYr(m), y: arr[i] })); }
+
+  const targetLine = months.map(m => ({ x: toYr(m), y: target }));
+
+  const datasets = [
+    // Outer band: p90 filled to p10
+    { label: 'P90', data: pts(bands.p90), borderColor: 'rgba(41,181,216,.2)', backgroundColor: 'rgba(41,181,216,.08)', fill: '+4', pointRadius: 0, borderWidth: 1, tension: .4 },
+    // Inner band: p75 filled to p25
+    { label: 'P75', data: pts(bands.p75), borderColor: 'rgba(41,181,216,.4)', backgroundColor: 'rgba(41,181,216,.16)', fill: '+2', pointRadius: 0, borderWidth: 1, tension: .4 },
+    // Median line
+    { label: 'Median', data: pts(bands.p50), borderColor: '#29b5d8', backgroundColor: 'transparent', fill: false, pointRadius: 0, borderWidth: 2.5, tension: .4 },
+    // P25 (lower bound of inner band, no fill)
+    { label: 'P25', data: pts(bands.p25), borderColor: 'rgba(41,181,216,.4)', backgroundColor: 'transparent', fill: false, pointRadius: 0, borderWidth: 1, tension: .4 },
+    // P10 (lower bound of outer band, no fill)
+    { label: 'P10', data: pts(bands.p10), borderColor: 'rgba(41,181,216,.2)', backgroundColor: 'transparent', fill: false, pointRadius: 0, borderWidth: 1, tension: .4 },
+    // Retirement target horizontal line
+    { label: 'Retirement Target', data: targetLine, borderColor: '#22d374', backgroundColor: 'transparent', borderDash: [7, 4], borderWidth: 1.5, fill: false, pointRadius: 0 },
+  ];
+
+  const options = {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    animation: { duration: 500 },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#0c1829',
+        borderColor: '#1c3254',
+        borderWidth: 1,
+        titleColor: '#dce8f4',
+        bodyColor: '#6a8aa4',
+        callbacks: {
+          title: items => 'Year ' + items[0].parsed.x.toFixed(1),
+          label: item => {
+            if (item.dataset.label === 'Retirement Target') return ' Target: ' + fmtCurrency(item.parsed.y);
+            return ' ' + item.dataset.label + ': ' + fmtCurrency(item.parsed.y);
+          },
+        },
+        filter: item => item.dataset.label !== 'P25' && item.dataset.label !== 'P10',
+      },
+    },
+    scales: {
+      x: {
+        type: 'linear',
+        title: { display: true, text: 'Years', color: '#6a8aa4', font: { size: 11 } },
+        ticks: { color: '#6a8aa4', font: { size: 11 }, callback: v => v % 5 === 0 ? v + ' yr' : '' },
+        grid: { color: 'rgba(28,50,84,.5)' },
+      },
+      y: {
+        title: { display: true, text: 'Portfolio Value', color: '#6a8aa4', font: { size: 11 } },
+        ticks: { color: '#6a8aa4', font: { size: 11 }, callback: fmtCurrency },
+        grid: { color: 'rgba(28,50,84,.5)' },
+        suggestedMax: yMax * 1.05,
+        min: 0,
+      },
+    },
+  };
+
+  if (growthChart) growthChart.destroy();
+  growthChart = new Chart(
+    document.getElementById('growthChart').getContext('2d'),
+    { type: 'line', data: { datasets }, options }
+  );
+}
+
+// ── distribution bar chart ────────────────────────────────
+function buildDistChart(data) {
+  const { counts, years } = data.histogram;
+  const total = counts.reduce((a, b) => a + b, 0);
+
+  document.getElementById('distSubtitle').textContent =
+    total.toLocaleString() + ' of ' + data.n_simulations.toLocaleString() +
+    ' simulations reached the retirement goal.';
+
+  const colors = years.map((y, i) => {
+    const ratio = i / Math.max(years.length - 1, 1);
+    const h = Math.round(165 - ratio * 55);  // green → cyan gradient
+    return `hsla(${h},70%,52%,.75)`;
+  });
+
+  const options = {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: { duration: 500 },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#0c1829',
+        borderColor: '#1c3254',
+        borderWidth: 1,
+        titleColor: '#dce8f4',
+        bodyColor: '#6a8aa4',
+        callbacks: {
+          title: items => 'Year ' + items[0].label,
+          label: item => ' ' + item.parsed.y.toLocaleString() + ' simulations',
+        },
+      },
+    },
+    scales: {
+      x: {
+        title: { display: true, text: 'Retirement Year', color: '#6a8aa4', font: { size: 11 } },
+        ticks: { color: '#6a8aa4', font: { size: 11 }, maxTicksLimit: 12 },
+        grid: { display: false },
+      },
+      y: {
+        title: { display: true, text: 'Simulations', color: '#6a8aa4', font: { size: 11 } },
+        ticks: { color: '#6a8aa4', font: { size: 11 } },
+        grid: { color: 'rgba(28,50,84,.5)' },
+      },
+    },
+  };
+
+  if (distChart) distChart.destroy();
+  distChart = new Chart(
+    document.getElementById('distChart').getContext('2d'),
+    {
+      type: 'bar',
+      data: {
+        labels: years,
+        datasets: [{ label: 'Simulations', data: counts, backgroundColor: colors, borderRadius: 4 }],
+      },
+      options,
+    }
+  );
+}
+</script>
+</body>
+</html>
