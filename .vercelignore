@@ -1,0 +1,6 @@
+# Hide Python backend files from Vercel — it only needs the frontend
+requirements.txt
+*.py
+__pycache__/
+templates/
+Procfile
