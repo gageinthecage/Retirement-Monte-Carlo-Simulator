@@ -1,7 +1,7 @@
 import numpy as np
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from RetirementSimulation import Retire_Simulate
+from simulator import Retire_Simulate
 
 app = FastAPI(title="Retirement Simulator API")
 
